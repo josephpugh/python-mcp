@@ -5,7 +5,6 @@ import httpx
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastmcp import Context, FastMCP
-from opentelemetry import trace
 from pydantic import BaseModel, Field
 
 from .logging_utils import setup_logging, setup_tracing, traced_span
@@ -23,7 +22,6 @@ app.mount("/mcp-server", mcp_app)
 setup_logging()
 setup_tracing(app)
 
-tracer = trace.get_tracer("weather-service.mcp")
 logger = logging.getLogger("weather-service")
 
 class WeatherRequest(BaseModel):

@@ -19,6 +19,7 @@ except ModuleNotFoundError:  # pragma: no cover - optional dependency
 
 from .config import get_settings
 
+tracer = trace.get_tracer("weather-service.mcp")
 
 def setup_logging() -> None:
     root = logging.getLogger()
