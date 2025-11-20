@@ -183,3 +183,97 @@ def test_health_check_response(main_module):
     response = main_module.healthz()
     assert response.status_code == 200
     assert response.body == b'{"status":"OK"}'
+
+
+@pytest.mark.asyncio
+async def test_weather_resource_tracing(monkeypatch, main_module):
+    expected = main_module.WeatherResponse(condition="Cloudy", temp_f=40.0, wind_mph=12.0)
+
+    async def fake_impl(city):
+        return expected
+
+    monkeypatch.setattr(main_module, "_get_weather_impl", fake_impl)
+
+    class DummySpan:
+        def __init__(self):
+            self.attributes = {}
+            self.set_status_calls = []
+            self.exceptions = []
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            pass
+
+        def set_attribute(self, key, value):
+            self.attributes[key] = value
+
+        def record_exception(self, exc):
+            self.exceptions.append(exc)
+
+        def set_status(self, status):
+            self.set_status_calls.append(status)
+
+    class DummyTracer:
+        def __init__(self):
+            self.spans = []
+
+        def start_as_current_span(self, name):
+            span = DummySpan()
+            self.spans.append((name, span))
+            return span
+
+    tracer = DummyTracer()
+    monkeypatch.setattr(main_module, "tracer", tracer)
+
+    result = await main_module.weather_forecast("Rome")
+
+    assert result is expected
+    assert tracer.spans[0][0] == "mcp.resource.weather_forecast"
+    span = tracer.spans[0][1]
+    assert span.attributes["weather.city"] == "Rome"
+    assert span.attributes["mcp.resource.success"] is True
+
+
+def test_greeting_prompt_tracing(monkeypatch, main_module):
+    class DummySpan:
+        def __init__(self):
+            self.attributes = {}
+            self.set_status_calls = []
+            self.exceptions = []
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            pass
+
+        def set_attribute(self, key, value):
+            self.attributes[key] = value
+
+        def record_exception(self, exc):
+            self.exceptions.append(exc)
+
+        def set_status(self, status):
+            self.set_status_calls.append(status)
+
+    class DummyTracer:
+        def __init__(self):
+            self.spans = []
+
+        def start_as_current_span(self, name):
+            span = DummySpan()
+            self.spans.append((name, span))
+            return span
+
+    tracer = DummyTracer()
+    monkeypatch.setattr(main_module, "tracer", tracer)
+
+    message = main_module.greeting_prompt("Sky")
+
+    assert "Sky" in message
+    assert tracer.spans[0][0] == "mcp.prompt.greeting"
+    span = tracer.spans[0][1]
+    assert span.attributes["prompt.name"] == "Sky"
+    assert span.attributes["mcp.prompt.success"] is True

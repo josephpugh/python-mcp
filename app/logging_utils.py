@@ -7,6 +7,7 @@ from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExport
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 try:
     from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
@@ -33,7 +34,7 @@ def setup_logging() -> None:
     root.addHandler(handler)
 
 
-def setup_tracing_basic() -> None:
+def setup_tracing(app) -> None:
     settings = get_settings()
 
     resource = Resource.create(
@@ -55,6 +56,8 @@ def setup_tracing_basic() -> None:
     for exporter in span_exporters:
         provider.add_span_processor(BatchSpanProcessor(exporter))
     trace.set_tracer_provider(provider)
+
+    FastAPIInstrumentor.instrument_app(app)
 
     if HTTPXClientInstrumentor:
         HTTPXClientInstrumentor().instrument()
